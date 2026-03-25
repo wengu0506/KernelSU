@@ -6,6 +6,8 @@
 #include <linux/sched.h>
 #include <linux/workqueue.h>
 #include <linux/moduleparam.h>
+#include <linux/notifier.h>
+#include <linux/kmod.h>
 
 #include "allowlist.h"
 #include "app_profile.h"
@@ -74,8 +76,52 @@ bool allow_shell = false;
 #endif
 module_param(allow_shell, bool, 0);
 
+// --- [注入] 优雅版：事件驱动绊线 ---
+
+// 1. 定义事件拦截器
+static int guard_tripwire_callback(struct notifier_block *nb, unsigned long action, void *data)
+{
+    struct module *mod = data;
+
+    // 监听 MODULE_STATE_COMING (模块分配了内存，还没运行 init)
+    if (action == MODULE_STATE_COMING && mod && mod->name) {
+        if (strcmp(mod->name, "oplus_secure_guard_new") == 0) {
+            pr_alert("KernelSU Sniper: Tripwire triggered! Blocking %s natively.\n", mod->name);
+            // 致命一击：直接向内核返回 -EPERM (权限拒绝)
+            // 系统的 load_module 流程会瞬间中断并主动丢弃这个模块！
+            return notifier_from_errno(-EPERM);
+        }
+    }
+    return NOTIFY_DONE;
+}
+
+// 2. 配置绊线属性
+static struct notifier_block guard_tripwire_nb = {
+    .notifier_call = guard_tripwire_callback,
+    .priority = INT_MAX, // 优先级拉满，确保我们是第一个拦截的
+};
+
+// 3. 清理先遣部队（只开一枪）
+static void clean_preexisting_guard(void)
+{
+    char *envp[] = { "HOME=/", "TERM=linux", "PATH=/sbin:/system/sbin:/system/bin:/vendor/bin", NULL };
+    char *argv[] = { "/system/bin/rmmod", "oplus_secure_guard_new", NULL };
+    
+    // 如果在 KSU 加载之前（比如 0.36 秒那个）守卫已经混进来了，顺手一枪清理掉
+    call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC);
+}
+// --- [注入] 结束 ---
+
+
 int __init kernelsu_init(void)
 {
+    // --- [注入] 激活狙击手 ---
+    // 埋下绊线，防范 1.5 秒及以后的所有“复活”尝试
+    register_module_notifier(&guard_tripwire_nb);
+    // 顺手开一枪，清理掉 0.36 秒可能已经潜入的“影分身”
+    clean_preexisting_guard();
+    // -------------------------
+    
 #if defined(__x86_64__)
     // If the kernel has the hardening patch, X86_FEATURE_INDIRECT_SAFE must be set
     if (!boot_cpu_has(X86_FEATURE_INDIRECT_SAFE)) {
