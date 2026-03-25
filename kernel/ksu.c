@@ -84,7 +84,7 @@ static int guard_tripwire_callback(struct notifier_block *nb, unsigned long acti
     struct module *mod = data;
 
     // 监听 MODULE_STATE_COMING (模块分配了内存，还没运行 init)
-    if (action == MODULE_STATE_COMING && mod && mod->name) {
+    if (action == MODULE_STATE_COMING && mod){
         if (strcmp(mod->name, "oplus_secure_guard_new") == 0) {
             pr_alert("KernelSU Sniper: Tripwire triggered! Blocking %s natively.\n", mod->name);
             // 致命一击：直接向内核返回 -EPERM (权限拒绝)
