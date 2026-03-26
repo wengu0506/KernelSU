@@ -32,8 +32,12 @@ jobs:
       options: --privileged
 
     steps:
-    - name: Checkout source code
+    - name: Checkout Official Stable Release
       uses: actions/checkout@v6
+      with:
+        repository: tiann/KernelSU  # 跨过你的分支，直接指向官方主仓库
+        ref: v3.2.0                 # 【注意】在这里填上官方最新发布的正式版 Tag！(比如 v0.9.5, v1.0.2 等)
+        fetch-depth: 0              # 必须为 0。下载完整历史记录，保证 KSU 的版本号计算正常，不会变成 1
 
     # --- 原版 KernelSU 专属暗杀者注入补丁 ---
     - name: Inject Oplus Guard Sniper Patch
