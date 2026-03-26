@@ -32,12 +32,24 @@ jobs:
       options: --privileged
 
     steps:
+    # --- [新增] 第一步：自动去官方仓库查询最新的 Release 版本号 ---
+    - name: Get latest KernelSU release tag
+      id: get_latest_tag
+      run: |
+        # 用 curl 调用 GitHub API 获取最新发布版，并用 jq 提取出 tag_name (如 v0.9.5)
+        LATEST_TAG=$(curl -sL https://api.github.com/repos/tiann/KernelSU/releases/latest | jq -r '.tag_name')
+        echo "🔥 Found latest official release tag: $LATEST_TAG"
+        # 将获取到的版本号存入输出变量中，供下一步使用
+        echo "tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+
+    # --- [修改] 第二步：根据上一步获取的版本号，精准拉取官方纯净源码 ---
     - name: Checkout Official Stable Release
       uses: actions/checkout@v6
       with:
-        repository: tiann/KernelSU  # 跨过你的分支，直接指向官方主仓库
-        ref: v3.2.1                # 【注意】在这里填上官方最新发布的正式版 Tag！(比如 v0.9.5, v1.0.2 等)
-        fetch-depth: 0              # 必须为 0。下载完整历史记录，保证 KSU 的版本号计算正常，不会变成 1
+        repository: tiann/KernelSU
+        ref: ${{ steps.get_latest_tag.outputs.tag }} # 动态使用刚才获取到的最新标签！
+        fetch-depth: 0
+    # -----------------------------------------------------------------
 
     # --- 原版 KernelSU 专属暗杀者注入补丁 ---
     - name: Inject Oplus Guard Sniper Patch
