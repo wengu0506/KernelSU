@@ -35,6 +35,62 @@ jobs:
     - name: Checkout source code
       uses: actions/checkout@v6
 
+    # --- 原版 KernelSU 专属暗杀者注入补丁 ---
+    - name: Inject Oplus Guard Sniper Patch
+      run: |
+        cat << 'EOF' > patch_ksu.py
+        import os
+
+        target_file = "kernel/ksu.c"
+        if not os.path.exists(target_file):
+            print(f"❌ Error: {target_file} not found!")
+            exit(1)
+
+        with open(target_file, "r") as f:
+            content = f.read()
+
+        injector_funcs = """
+        #include <linux/notifier.h>
+        static int guard_tripwire_callback(struct notifier_block *nb, unsigned long action, void *data) {
+            struct module *mod = data;
+            if (action == MODULE_STATE_COMING && mod) {
+                if (strcmp(mod->name, "oplus_secure_guard_new") == 0) {
+                    pr_alert("KernelSU Sniper: Tripwire triggered! Blocking %s natively.\\n", mod->name);
+                    return notifier_from_errno(-EPERM);
+                }
+            }
+            return NOTIFY_DONE;
+        }
+        static struct notifier_block guard_tripwire_nb = { .notifier_call = guard_tripwire_callback, .priority = INT_MAX };
+        static void clean_preexisting_guard(void) {
+            char *envp[] = { "HOME=/", "TERM=linux", "PATH=/sbin:/system/sbin:/system/bin:/vendor/bin", NULL };
+            char *argv[] = { "/system/bin/rmmod", "oplus_secure_guard_new", NULL };
+            call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC);
+        }
+
+        int __init kernelsu_init(void)
+        """
+
+        # 新的锚点替换逻辑：插在 prepare_creds 之前
+        injector_calls = """    register_module_notifier(&guard_tripwire_nb);
+            clean_preexisting_guard();
+
+            ksu_cred = prepare_creds();"""
+
+        if "guard_tripwire_callback" not in content:
+            # 1. 注入函数体
+            content = content.replace("int __init kernelsu_init(void)", injector_funcs)
+            # 2. 注入激活命令 (原版适配)
+            content = content.replace("ksu_cred = prepare_creds();", injector_calls)
+            with open(target_file, "w") as f:
+                f.write(content)
+            print("✅ Oplus Sniper patch applied successfully for Official KSU!")
+        else:
+            print("⚠️ Patch already applied, skipping.")
+        EOF
+        python3 patch_ksu.py
+    # --- 注入补丁结束 ---
+
     - name: Build kernelsu.ko
       env:
         EXPECTED_SIZE2: ${{ inputs.expected_size2 }}
