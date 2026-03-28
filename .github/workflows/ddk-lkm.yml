@@ -57,7 +57,7 @@ jobs:
         cat << 'EOF' > patch_ksu.py
         import os
 
-        target_file = "kernel/ksu.c"
+        target_file = "kernel/core/init.c"
         if not os.path.exists(target_file):
             print(f"❌ Error: {target_file} not found!")
             exit(1)
