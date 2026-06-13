@@ -11,7 +11,9 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Adb
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.ContactPage
 import androidx.compose.material.icons.filled.Delete
@@ -20,18 +22,17 @@ import androidx.compose.material.icons.filled.ElectricalServices
 import androidx.compose.material.icons.filled.Fence
 import androidx.compose.material.icons.filled.FolderDelete
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Policy
 import androidx.compose.material.icons.filled.RemoveCircle
 import androidx.compose.material.icons.filled.RemoveModerator
 import androidx.compose.material.icons.filled.Update
 import androidx.compose.material.icons.rounded.Dashboard
 import androidx.compose.material.icons.rounded.UploadFile
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
@@ -55,14 +56,13 @@ import me.weishu.kernelsu.ui.component.material.SegmentedDropdownItem
 import me.weishu.kernelsu.ui.component.material.SegmentedListItem
 import me.weishu.kernelsu.ui.component.material.SegmentedSwitchItem
 import me.weishu.kernelsu.ui.component.material.SendLogBottomSheet
+import me.weishu.kernelsu.ui.component.material.SnackBarHost
 import me.weishu.kernelsu.ui.component.uninstalldialog.UninstallDialog
-import me.weishu.kernelsu.ui.util.LocalSnackbarHost
 
 /**
  * @author weishu
  * @date 2023/1/1.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingPagerMaterial(
     uiState: SettingsUiState,
@@ -70,9 +70,9 @@ fun SettingPagerMaterial(
     bottomInnerPadding: Dp,
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
-    val snackBarHost = LocalSnackbarHost.current
+    val snackBarHost = remember { SnackbarHostState() }
     val showUninstallDialog = rememberSaveable { mutableStateOf(false) }
-    var showBottomsheet by remember { mutableStateOf(false) }
+    var showBottomSheet by remember { mutableStateOf(false) }
 
     UninstallDialog(
         show = showUninstallDialog.value,
@@ -81,11 +81,9 @@ fun SettingPagerMaterial(
 
     Scaffold(
         topBar = {
-            TopBar(
-                scrollBehavior = scrollBehavior
-            )
+            TopBar(scrollBehavior = scrollBehavior)
         },
-        snackbarHost = { SnackbarHost(snackBarHost) },
+        snackbarHost = { SnackBarHost(hostState = snackBarHost, modifier = Modifier.padding(bottom = bottomInnerPadding)) },
         contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)
     ) { paddingValues ->
         Column(
@@ -214,6 +212,57 @@ fun SettingPagerMaterial(
                             )
                         },
                         {
+                            val selinuxHideSummary = when (uiState.selinuxHideStatus) {
+                                "unsupported" -> stringResource(id = R.string.feature_status_unsupported_summary)
+                                "managed" -> stringResource(id = R.string.feature_status_managed_summary)
+                                else -> stringResource(id = R.string.settings_selinux_hide_summary)
+                            }
+                            SegmentedSwitchItem(
+                                icon = Icons.Filled.Policy,
+                                title = stringResource(id = R.string.settings_selinux_hide),
+                                summary = selinuxHideSummary,
+                                enabled = uiState.selinuxHideStatus == "supported",
+                                checked = uiState.isSelinuxHideEnabled,
+                                onCheckedChange = actions.onSetSelinuxHideEnabled
+                            )
+                        },
+                        {
+                            val sulogSummary = when (uiState.sulogStatus) {
+                                "unsupported" -> stringResource(id = R.string.feature_status_unsupported_summary)
+                                "managed" -> stringResource(id = R.string.feature_status_managed_summary)
+                                else -> stringResource(id = R.string.settings_sulog_summary)
+                            }
+                            SegmentedSwitchItem(
+                                icon = Icons.AutoMirrored.Filled.Article,
+                                title = stringResource(id = R.string.settings_sulog),
+                                summary = sulogSummary,
+                                enabled = uiState.sulogStatus == "supported",
+                                checked = uiState.isSulogEnabled,
+                                onCheckedChange = actions.onSetSulogEnabled
+                            )
+                        },
+                        {
+                            val adbRootSummary = when (uiState.adbRootStatus) {
+                                "unsupported" -> stringResource(id = R.string.feature_status_unsupported_summary)
+                                "managed" -> stringResource(id = R.string.feature_status_managed_summary)
+                                else -> stringResource(id = R.string.settings_adb_root_summary)
+                            }
+                            SegmentedSwitchItem(
+                                icon = Icons.Filled.Adb,
+                                title = stringResource(id = R.string.settings_adb_root),
+                                summary = adbRootSummary,
+                                enabled = uiState.adbRootStatus == "supported",
+                                checked = uiState.isAdbRootEnabled,
+                                onCheckedChange = actions.onSetAdbRootEnabled
+                            )
+                        },
+                    )
+                )
+
+                SegmentedColumn(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    content = listOf(
+                        {
                             SegmentedSwitchItem(
                                 icon = Icons.Filled.FolderDelete,
                                 title = stringResource(id = R.string.settings_umount_modules_default),
@@ -267,7 +316,7 @@ fun SettingPagerMaterial(
                 content = listOf(
                     {
                         SegmentedListItem(
-                            onClick = { showBottomsheet = true },
+                            onClick = { showBottomSheet = true },
                             headlineContent = { Text(stringResource(id = R.string.send_log)) },
                             leadingContent = {
                                 Icon(
@@ -293,15 +342,17 @@ fun SettingPagerMaterial(
             )
             Spacer(modifier = Modifier.height(8.dp))
 
-            if (showBottomsheet) {
-                SendLogBottomSheet { showBottomsheet = false }
+            if (showBottomSheet) {
+                SendLogBottomSheet(
+                    onDismiss = { showBottomSheet = false },
+                    snackbarHostState = snackBarHost,
+                )
             }
             Spacer(modifier = Modifier.height(bottomInnerPadding))
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun TopBar(
     scrollBehavior: TopAppBarScrollBehavior? = null

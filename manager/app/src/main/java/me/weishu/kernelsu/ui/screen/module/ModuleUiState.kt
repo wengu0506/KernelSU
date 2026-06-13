@@ -42,6 +42,7 @@ sealed interface ModuleEffect {
 @Immutable
 data class ModuleUiState(
     val isRefreshing: Boolean = false,
+    val hasLoaded: Boolean = false,
     val modules: List<Module> = emptyList(),
     val moduleList: List<Module> = emptyList(),
     val updateInfo: Map<String, ModuleUpdateInfo> = emptyMap(),
@@ -53,7 +54,6 @@ data class ModuleUiState(
     val isSafeMode: Boolean = false,
     val magiskInstalled: Boolean = false,
     val confirmDialogState: ModuleConfirmDialogState? = null,
-    val effect: ModuleEffect? = null,
 ) {
     val installButtonVisible: Boolean
         get() = !(isSafeMode || magiskInstalled)
@@ -68,7 +68,6 @@ data class ModuleActions(
     val onRequestUpdateConfirmation: (Module, ModuleUpdateInfo) -> Unit,
     val onRequestUninstallConfirmation: (Module) -> Unit,
     val onDismissConfirmRequest: () -> Unit,
-    val onConsumeEffect: () -> Unit,
     val onConfirmUpdate: (ModuleConfirmRequest.Update) -> Unit,
     val onOpenRepo: () -> Unit,
     val onToggleSortActionFirst: () -> Unit,
